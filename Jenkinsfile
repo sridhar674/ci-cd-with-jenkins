@@ -1,31 +1,55 @@
 pipeline {
-    agent {
-        docker {
-            image 'docker:20.10.16'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
+    agent any
+
+    environment {
+        DOCKER_COMPOSE = "docker-compose"
     }
+
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/sridhar674/ci-cd-with-jenkins.git'
+                git branch: 'main', url: 'https://github.com/sridhar674/ci-cd-with-jenkins.git'
             }
         }
-        stage('Build & Run') {
+
+        stage('Build & Run Containers') {
             steps {
-                sh 'docker-compose build'
-                sh 'docker-compose up -d'
+                sh "${DOCKER_COMPOSE} down || true"   // cleanup if something is running
+                sh "${DOCKER_COMPOSE} build"
+                sh "${DOCKER_COMPOSE} up -d"
             }
         }
-        stage('Test') {
+
+        stage('Verify Services') {
             steps {
-                sh 'curl -f http://localhost:3000 || exit 1'
+                script {
+                    // Example: check frontend (React/Node on port 3000)
+                    sh 'sleep 10'  // wait for containers to be up
+                    sh 'curl -f http://localhost:3000 || exit 1'
+                    
+                    // Example: check backend (Spring Boot/Node/Java on port 8080)
+                    sh 'curl -f http://localhost:8080 || exit 1'
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh "${DOCKER_COMPOSE} down"
             }
         }
     }
+
     post {
         always {
-            sh 'docker-compose down'
+            echo "Cleaning up after pipeline"
+            sh "${DOCKER_COMPOSE} down || true"
+        }
+        success {
+            echo "✅ Pipeline executed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed! Check logs above."
         }
     }
 }
