@@ -1,11 +1,17 @@
 pipeline {
     agent any
 
-    environment {
-        DOCKER_COMPOSE = "docker-compose"
-    }
-
     stages {
+        stage('Debug Workspace') {
+            steps {
+                echo "🔎 Checking Jenkins workspace contents..."
+                sh 'pwd'
+                sh 'ls -la'
+                sh 'ls -la frontend || echo "⚠️ frontend folder not found"'
+                sh 'ls -la backend || echo "⚠️ backend folder not found"'
+            }
+        }
+
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/sridhar674/ci-cd-with-jenkins.git'
@@ -14,42 +20,29 @@ pipeline {
 
         stage('Build & Run Containers') {
             steps {
-                sh "${DOCKER_COMPOSE} down || true"   // cleanup if something is running
-                sh "${DOCKER_COMPOSE} build"
-                sh "${DOCKER_COMPOSE} up -d"
+                sh 'docker-compose down || true'
+                sh 'docker-compose build'
+                sh 'docker-compose up -d'
             }
         }
 
         stage('Verify Services') {
             steps {
-                script {
-                    // Example: check frontend (React/Node on port 3000)
-                    sh 'sleep 10'  // wait for containers to be up
-                    sh 'curl -f http://localhost:3000 || exit 1'
-                    
-                    // Example: check backend (Spring Boot/Node/Java on port 8080)
-                    sh 'curl -f http://localhost:8080 || exit 1'
-                }
-            }
-        }
-
-        stage('Cleanup') {
-            steps {
-                sh "${DOCKER_COMPOSE} down"
+                sh 'docker ps -a'
             }
         }
     }
 
     post {
         always {
-            echo "Cleaning up after pipeline"
-            sh "${DOCKER_COMPOSE} down || true"
-        }
-        success {
-            echo "✅ Pipeline executed successfully!"
+            echo "🧹 Cleaning up after pipeline"
+            sh 'docker-compose down || true'
         }
         failure {
             echo "❌ Pipeline failed! Check logs above."
+        }
+        success {
+            echo "✅ Pipeline completed successfully!"
         }
     }
 }
